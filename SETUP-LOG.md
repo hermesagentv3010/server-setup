@@ -66,4 +66,6 @@ non-shareable items are marked `FIXME: set locally`.
 - **Verify:** job appears in `cronjob list` and posts a daily summary; `gh repo view hermesagentv3010/server-setup --json url -q .url` → the repo link.
 - **Note:** log agent records only shareable changes; secrets handled out-of-band. If `gh auth` expires, both crons break — re-run `gh auth login`. Cron delivery target is configured in the Hermes scheduler, never in this repo.
 
+<!-- daily log: no notable changes -->
+
 <!-- New entries go ABOVE this line, newest first, same format. -->
