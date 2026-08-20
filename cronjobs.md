@@ -40,16 +40,21 @@ cronjob create
   deliver:     <your-telegram-chat-id>     # FIXME: set locally
   prompt: |
     Maintain /root/server-setup (branch: main). Read Hermes session history
-    since the last SETUP-LOG.md entry (session_search, newest first). Append
-    any SHAREABLE server change as a compact, dated-free entry ABOVE the
-    "<!-- New entries go ABOVE this line ... -->" marker, same format as
-    existing entries (### Title / Why / Do / Verify / Note):
-      - newly installed/removed pacman packages
-      - edits to ~/.hermes/config.yaml, ~/.config/starship.toml, ~/.bashrc, /etc configs
-      - new or changed Hermes plugins/scripts/cron jobs
-      - external services or accounts newly wired up
-    NEVER log secrets/keys/tokens/private data/chat IDs — use "FIXME: set locally".
-    If nothing notable, append a single short "no notable changes" line.
+ since the last SETUP-LOG.md entry (session_search, newest first). Append
+ any SHAREABLE server change as a compact entry ABOVE the
+ "<!-- New entries go ABOVE this line ... -->" marker, same format as
+ existing entries (## Title / Why / Do / Verify / Note):
+   - newly installed/removed pacman packages (install current extra packages; say
+     e.g. "pacman -S sops age", NOT "sops 3.13.3-1")
+   - edits to ~/.hermes/config.yaml, ~/.config/starship.toml, ~/.bashrc, /etc configs
+   - new or changed Hermes plugins/skills/scripts/cron jobs
+   - external services or accounts newly wired up
+ RULES:
+   - NEVER pin exact package versions (they rot) — record the install command, not a number.
+   - NEVER log secrets/keys/tokens/private data/chat IDs — use "FIXME: set locally".
+   - NEVER add diary/status prose — this is a rebuild recipe, not a log of the day.
+   - Mark MINIMUM version requirements only where a feature needs it (e.g. "age >=1.3.0 for -pq").
+ If nothing notable, append a single short "no notable changes" line.
     Then commit + push:
       cd /root/server-setup && git add -A && \
       git commit -m "daily log: <summary or 'no changes'>" && git push origin main
