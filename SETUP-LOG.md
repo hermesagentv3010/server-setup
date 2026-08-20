@@ -66,6 +66,24 @@ non-shareable items are marked `FIXME: set locally`.
 - **Verify:** job appears in `cronjob list` and posts a daily summary; `gh repo view hermesagentv3010/server-setup --json url -q .url` → the repo link.
 - **Note:** log agent records only shareable changes; secrets handled out-of-band. If `gh auth` expires, both crons break — re-run `gh auth login`. Cron delivery target is configured in the Hermes scheduler, never in this repo.
 
+## sops + age installed (pacman, post-quantum secret tooling)
+- **Why:** user wants agent-managed encrypted secrets without the agent ever seeing plaintext.
+- **Do:** `pacman -S --noconfirm sops age` (sops 3.13.3-1, age 1.3.1-1, both from `extra`; no AUR).
+- **Verify:** `sops --version` and `age --version`.
+- **Note:** age ≥1.3 is required for the `-pq` (ML-KEM-768 + X25519) post-quantum key mode.
+
+## sops-age-pq-management Hermes skill
+- **Why:** codify the no-editor, pipe-generated-secret sops workflow plus the Komodo/Podman consumption pattern.
+- **Do:** created `/root/.hermes/skills/sops-age-pq-management/SKILL.md` (non-interactive `sops -e -i` + `sops --set`, `(?i)` `encrypted_regex`, tmpfs decrypt unit).
+- **Verify:** skill loads via Hermes skill list / `skill_view sops-age-pq-management`.
+- **Note:** key lessons baked in — never hand-type the ~2000-char recipient (read from file), `encrypted_regex` is case-sensitive by default, never print decrypted values.
+
+## PQ age keypair (secret — user custody)
+- **Why:** encrypts/decrypts the sops stores; the private key must stay with the user and never enter the repo.
+- **Do:** `age-keygen -pq -o /root/.config/sops/age/keys.txt`; public recipient saved to `/root/.config/sops/age/recipient.txt`.
+- **Verify:** private key line begins `AGE-SECRET-KEY-PQ-1…`, recipient begins `age1pq1…`.
+- **Note:** secret — private key value is FIXME: set locally; back it up off-box. Recipient is non-secret but host-specific.
+
 <!-- daily log: no notable changes -->
 
 <!-- New entries go ABOVE this line, newest first, same format. -->
