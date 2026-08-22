@@ -20,7 +20,7 @@ cronjob create
   no_agent:    true
   deliver:     <your-telegram-chat-id>     # FIXME: set locally
 ```
-Script: [`files/arch_update.sh`](files/arch_update.sh) → `~/.hermes/scripts/arch_update.sh` (`chmod +x`). Silent on success; alerts on failure.
+Script: [`files/arch_update.sh`](files/arch_update.sh) → `~/.hermes/scripts/arch_update.sh` (`chmod +x`). Silent on success; alerts on failure. Also runs a best-effort `brew update`/`upgrade` as the dedicated non-root `linuxbrew` user (skipped cleanly if Homebrew is absent).
 
 **Raw fallback:**
 ```cron
@@ -39,7 +39,7 @@ cronjob create
   schedule:    17 4 * * *
   deliver:     <your-telegram-chat-id>     # FIXME: set locally
   prompt: |
-    Maintain /root/server-setup (branch: main). Read Hermes session history
+    Maintain /srv/hermes-workspace/projects/server-setup (branch: main). Read Hermes session history
  since the last SETUP-LOG.md entry (session_search, newest first). Append
  any SHAREABLE server change as a compact entry ABOVE the
  "<!-- New entries go ABOVE this line ... -->" marker, same format as
@@ -56,14 +56,35 @@ cronjob create
    - Mark MINIMUM version requirements only where a feature needs it (e.g. "age >=1.3.0 for -pq").
  If nothing notable, append a single short "no notable changes" line.
     Then commit + push:
-      cd /root/server-setup && git add -A && \
+      cd /srv/hermes-workspace/projects/server-setup && git add -A && \
       git commit -m "daily log: <summary or 'no changes'>" && git push origin main
     End with a one-paragraph summary.
 ```
 
 **Raw fallback:**
 ```cron
-17 4 * * *  /usr/local/lib/hermes-agent/venv/bin/hermes chat -q "Run server-setup-daily-log: append notable shareable changes to /root/server-setup/SETUP-LOG.md and push." >>/root/.hermes/logs/daily-log.cron.log 2>&1
+17 4 * * *  /usr/local/lib/hermes-agent/venv/bin/hermes chat -q "Run server-setup-daily-log: append notable shareable changes to /srv/hermes-workspace/projects/server-setup/SETUP-LOG.md and push." >>/root/.hermes/logs/daily-log.cron.log 2>&1
+```
+
+---
+
+## workspace-hygiene — weekly workspace sweep (Mondays)
+Schedule: `0 5 * * 1`
+
+**Hermes:**
+```
+cronjob create
+  name:        workspace-hygiene
+  schedule:    0 5 * * 1
+  script:      workspace_hygiene.sh
+  no_agent:    true
+  deliver:     <your-telegram-chat-id>     # FIXME: set locally
+```
+Script: [`files/workspace_hygiene.sh`](files/workspace_hygiene.sh) → `~/.hermes/scripts/workspace_hygiene.sh` (`chmod +x`). Moves stray items from the workspace root into `tmp/quarantine/<ISO-week>/`, deletes anything under `tmp/` older than 7 days; silent when there is nothing to do. Never touches `projects/` or `.hermes.md`. Pair with the `pre_tool_call` hook from SETUP-LOG ("Workspace hygiene") which blocks writes at the workspace root in the first place.
+
+**Raw fallback:**
+```cron
+0 5 * * 1  /root/.hermes/scripts/workspace_hygiene.sh >>/root/.hermes/logs/workspace_hygiene.cron.log 2>&1
 ```
 
 ---

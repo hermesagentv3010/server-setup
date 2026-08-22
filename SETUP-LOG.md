@@ -113,4 +113,101 @@ items are marked `FIXME: set locally`.
   not wired up yet. `mkfs` is hard-blocked in the agent shell, so the format was run
   via a wrapper script; a human rebuild runs `mkfs.btrfs` directly.
 
+## Web backends: ddgs search + jina extract
+- Why: split web_search / web_extract across two key-free backends instead of
+  one `web.backend` driving both.
+- Do:
+  ```bash
+  hermes config set web.search_backend ddgs    # DuckDuckGo, search-only
+  hermes config set web.extract_backend jina   # Jina Reader r.jina.ai, extract-only
+  ```
+  Both ship as bundled plugins under `/usr/local/lib/hermes-agent/plugins/web/`
+  — no extra files needed. Keep `web.backend: jina` as the fallback value.
+- Verify: a fresh session's `web_search` routes through ddgs and `web_extract`
+  through jina; jina-only extraction errors ("search-only backend") are gone.
+- Note: per-capability keys override `web.backend`; changes apply on new sessions.
+
+## Model provider switched to OpenCode Zen (key delivery via Telegram drop page)
+- Why: previous free-tier provider was unreliable; user wanted to swap models
+  and deliver the API key without pasting secrets into chat or shell history.
+- Do:
+  ```bash
+  hermes config set model.provider opencode-zen
+  hermes config set model.default <model-id>        # pick from the provider list
+  hermes config set model.base_url https://opencode.ai/zen/v1
+  hermes config set model.api_mode chat_completions
+  ```
+  Key lands in `~/.hermes/.env` as `OPENCODE_ZEN_API_KEY` — FIXME: set locally.
+- Verify: `hermes chat -q "say hi"` answers on the new provider; `.env` still
+  holds all pre-existing keys.
+- Note: a mid-update gateway restart once truncated `.env` — after any restart,
+  check `.env` line count before assuming keys survived. Keep provider keys out
+  of chat; enter them only into silent prompts or files directly.
+
+## Dedicated SSH keypair for the Hack Club VPS
+- Why: passwordless agent access to a borrowed Debian LXC used as a throwaway
+  staging box (experiments before prod).
+- Do:
+  ```bash
+  ssh-keygen -t ed25519 -f ~/.ssh/hermes_vps_ed25519 -N '' -C "hermes-vps"
+  # share ONLY the .pub half; add it to the VPS authorized_keys out-of-band
+  ssh -i ~/.ssh/hermes_vps_ed25519 <user>@<host>   # FIXME: set locally
+  ```
+- Verify: `ssh -o BatchMode=yes -i ~/.ssh/hermes_vps_ed25519 <user>@<host> whoami`
+  returns the remote user without prompting.
+- Note: private key never leaves this box; host/user/address stay out of the repo.
+
+## Determinate Nix + devenv (dev environments directive)
+- Why: reproducible project dev shells; all projects get devenv.nix/devenv.yaml/.envrc.
+- Do: install via the Determinate installer (https://install.determinate.systems/nix).
+  Then pin GC so the store doesn't grow unbounded — add `/etc/nix/nix.custom.conf`:
+  ```
+  min-free = 10G
+  max-free = 50G
+  ```
+  and override the weekly GC timer to Sundays 03:00 with
+  `nix-collect-garbage --older-than 21d` (drop-in under
+  `/etc/systemd/system/nix-gc.service.d/`). Install devenv from the nixpkgs
+  flake (`nix profile install nixpkgs#devenv`). Per project:
+  `devenv.nix` + `devenv.yaml` + `.envrc`, then trust once via `devenv allow`.
+- Verify: `nix --version` reports Determinate Nix; `systemctl status nix-gc.timer`;
+  inside a project, `devenv shell` builds and enters the environment.
+- Note: system node exists but projects should use the devenv-provided node.
+
+## Homebrew on Arch (as dedicated linuxbrew user)
+- Why: some tooling installs more cleanly via brew than pacman; runs non-root.
+- Do: standard Homebrew install script (creates `/home/linuxbrew` owned by a
+  dedicated `linuxbrew` user); brew is then driven via
+  `runuser -u linuxbrew -- brew ...` since it refuses to run as root.
+- Verify: `runuser -u linuxbrew -- /home/linuxbrew/.linuxbrew/bin/brew --version`.
+- Note: wired into the daily update cron below — pacman first, brew best-effort.
+
+## Workspace hygiene: hook + weekly sweep cron + workspace move
+- Why: stop scratch litter in `/root` and repo checkouts; give Hermes a durable
+  workspace on the big data disk.
+- Do:
+  1. Move repos to `/srv/hermes-workspace/projects/<repo>/` and set
+     `hermes config set terminal.cwd /srv/hermes-workspace`. Scratch belongs in
+     `/srv/hermes-workspace/tmp/<task-name>/`.
+  2. Drop a `.hermes.md` at the workspace root stating the placement rules
+     (auto-loaded into every session working there) — see this repo's tree.
+  3. Copy `files/workspace_hygiene_guard.py` → `~/.hermes/agent-hooks/` and
+     register in `~/.hermes/config.yaml`:
+     ```yaml
+     hooks:
+       pre_tool_call:
+         - matcher: write_file|patch
+           command: /root/.hermes/agent-hooks/workspace_hygiene_guard.py
+           timeout: 10
+     ```
+     It blocks write_file/patch at the workspace root (enforcement, not advice).
+  4. Copy `files/workspace_hygiene.sh` → `~/.hermes/scripts/` (`chmod +x`) and
+     register Hermes cron `workspace-hygiene` Mondays 05:00 no_agent (see
+     `cronjobs.md`): sweeps stray root items into `tmp/quarantine/<ISO-week>/`,
+     deletes tmp entries older than 7 days; silent when nothing to do.
+- Verify: a `write_file` at the workspace root is blocked while the same write
+  under `tmp/` succeeds; run the sweep script manually and confirm quarantine +
+  stale-wipe output only when work exists.
+- Note: hook path is absolute under `/root/.hermes` even though the workspace moved.
+
 <!-- New entries go ABOVE this line, newest first, same format. -->
